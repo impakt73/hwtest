@@ -4,17 +4,17 @@
 
 int main(int argc, char** argv)
 {
-    ProtoBridge hBridge;
-    CreateProtoBridge(&hBridge);
+    uint64_t pMemory[1] = { 2 };
 
-    uint64_t data = 1;
+    ProtoBridge hBridge;
+    CreateProtoBridge(&hBridge, &pMemory, sizeof(pMemory));
 
     const uint32_t kNumCycles = 8;
     for (uint32_t cycleIndex = 0; cycleIndex < kNumCycles; ++cycleIndex)
     {
-        data = UpdateProtoBridge(hBridge, data);
+        UpdateProtoBridge(hBridge);
 
-	printf("Cycle [%u] Data: %" PRIu64 "\n", cycleIndex, data);
+        printf("Cycle [%u] Data: %" PRIu64 "\n", cycleIndex, pMemory[0]);
     }
 
     DestroyProtoBridge(hBridge);
