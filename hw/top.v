@@ -1,3 +1,5 @@
+`include "icp.v"
+
 module top
 (
     input i_clk,
@@ -13,47 +15,18 @@ module top
     output reg [63:0] o_data
 );
 
-reg [1:0]  r_state;
-reg [63:0] r_data;
+icp icp_inst
+(
+    .i_clk(i_clk),
+    .i_rst(i_rst),
 
-parameter read    = 2'b00;
-parameter compute = 2'b01;
-parameter write   = 2'b10;
+    .o_read_en(o_read_en),
+    .o_read_addr(o_read_addr[31:0]),
+    .i_data_in(i_data[31:0]),
 
-always_ff @ (posedge i_clk or posedge i_rst) begin
-
-    if (i_rst) begin
-        o_read_en  <= 0;
-        o_write_en <= 0;
-        r_state    <= read;
-    end
-    else begin
-        case (r_state)
-            read:
-                begin
-                    o_write_en  <= 0;
-                    o_read_en   <= 1;
-                    o_read_addr <= 0;
-                    r_state     <= compute;
-                end
-            compute:
-                begin
-                    o_read_en   <= 0;
-                    r_data      <= (i_data << 1);
-                    r_state     <= write;
-                end
-            write:
-                begin
-                    o_write_en   <= 1;
-                    o_write_addr <= 0;
-                    o_data       <= r_data;
-                    r_state      <= read;
-                end
-            default:
-                r_state <= read;
-        endcase
-    end
-
-end
+    .o_write_en(o_write_en),
+    .o_write_addr(o_write_addr[31:0]),
+    .o_data_out(o_data[31:0])
+);
 
 endmodule
