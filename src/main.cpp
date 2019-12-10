@@ -12,13 +12,14 @@ int main(int argc, char** argv)
     ProtoBridge hBridge;
     CreateProtoBridge(&hBridge, &pMemory, sizeof(pMemory));
 
-    const uint32_t kNumCycles = 384;
-    for (uint32_t cycleIndex = 0; cycleIndex < kNumCycles; ++cycleIndex)
+    uint32_t numCycles = 0;
+    while (ReadProtoBridgeRegister(hBridge, 0) == 0)
     {
         UpdateProtoBridge(hBridge);
-
-        //printf("Cycle [%u] Data: %u\n", cycleIndex, pMemory[8]);
+        ++numCycles;
     }
+
+    printf("Finished in %u Cycles\n", numCycles);
 
     const uint32_t kNumDwords = static_cast<uint32_t>(sizeof(pMemory) / sizeof(pMemory[0]));
     printf("Final Memory[%u]: {\n", kNumDwords);

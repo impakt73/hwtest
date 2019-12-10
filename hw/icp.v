@@ -9,7 +9,9 @@ module icp
 
     output reg o_write_en,
     output reg [31:0] o_write_addr,
-    output reg [31:0] o_data_out
+    output reg [31:0] o_data_out,
+
+    output reg o_halted
 );
 
 reg [31:0] r_pc;
@@ -31,6 +33,8 @@ parameter OP_ADD      = 7'd1;
 parameter OP_MULTIPLY = 7'd2;
 parameter OP_HALT     = 7'd99;
 parameter OP_JUMP     = 7'd100;
+
+assign o_halted = (r_state == S_HALTED);
 
 always @ (posedge i_clk) begin
 
