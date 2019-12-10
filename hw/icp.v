@@ -3,31 +3,21 @@ module icp
     input i_clk,
     input i_rst,
 
-    output reg o_read_en,
-    output reg [31:0] o_read_addr,
-    input  [31:0] i_data_in,
-
-    output reg o_write_en,
-    output reg [31:0] o_write_addr,
-    output reg [31:0] o_data_out,
+    output  reg  [1:0]  o_op[3:0],
+    output  reg  [12:0] o_addr[3:0],
+    input   wire [63:0] i_data[3:0],
+    output  reg  [63:0] o_data[3:0],
 
     output reg o_halted
 );
 
-reg [31:0] r_pc;
-reg [3:0]  r_state;
-reg [31:0] r_regs[3:0];
+reg [10:0] r_pc;
+reg [1:0]  r_state;
 
-parameter S_FETCH_OPCODE     = 4'h0;
-parameter S_DECODE_OPCODE    = 4'h1;
-parameter S_FETCH_OPERAND_0  = 4'h2;
-parameter S_FETCH_OPERAND_1  = 4'h3;
-parameter S_FETCH_OPERAND_2  = 4'h4;
-parameter S_EXECUTE_OPCODE   = 4'h5;
-parameter S_FETCH_POSITION_0 = 4'h6;
-parameter S_FETCH_POSITION_1 = 4'h7;
-parameter S_WRITE_RESULT     = 4'h8;
-parameter S_HALTED           = 4'h9;
+parameter S_FETCH_OPCODE   = 2'h0;
+parameter S_DECODE_OPCODE  = 2'h1;
+parameter S_EXECUTE_OPCODE = 2'h2;
+parameter S_HALTED         = 2'h3;
 
 parameter OP_ADD      = 7'd1;
 parameter OP_MULTIPLY = 7'd2;
@@ -39,10 +29,12 @@ assign o_halted = (r_state == S_HALTED);
 always @ (posedge i_clk) begin
 
     if (i_rst) begin
-        r_pc       <= 0;
-        o_read_en  <= 0;
-        o_write_en <= 0;
-        r_state    <= S_FETCH_OPCODE;
+        integer portIndex;
+        for (portIndex = 0; portIndex < 4; ++portIndex)
+            o_op[portIndex] <= 0; // NONE
+
+        r_pc    <= 0;
+        r_state <= S_FETCH_OPCODE;
     end
     else begin
         $display("State: %d", r_state);
@@ -50,65 +42,42 @@ always @ (posedge i_clk) begin
             S_FETCH_OPCODE:
                 begin
                     // Request the opcode from memory
-                    o_read_addr <= r_pc;
-                    o_read_en   <= 1;
-                    o_write_en  <= 0;
-                    r_state     <= S_DECODE_OPCODE;
+                    integer portIndex;
+                    for (portIndex = 0; portIndex < 4; ++portIndex)
+                        begin
+                            o_op[portIndex]   <= 1; // READ
+                            o_addr[portIndex] <= { {2{1'b0}}, r_pc + portIndex[10:0] };
+                        end
+
+                    r_state <= S_DECODE_OPCODE;
                 end
             S_DECODE_OPCODE:
                 begin
-                    // Store the opcode in our first register
-                    r_regs[0] <= i_data_in;
-
-                    // Begin reading the operands
-                    o_read_addr <= r_pc + 4;
-                    r_state     <= S_FETCH_OPERAND_0;
-                end
-            S_FETCH_OPERAND_0:
-                begin
-                    // Store the operand data in registers
-                    r_regs[1] <= i_data_in;
-
-                    // Read the next operand
-                    o_read_addr <= r_pc + 8;
-                    r_state     <= S_FETCH_OPERAND_1;
-                end
-            S_FETCH_OPERAND_1:
-                begin
-                    // Store the operand data in registers
-                    r_regs[2] <= i_data_in;
-
-                    // Read the next operand
-                    o_read_addr <= r_pc + 12;
-                    r_state     <= S_FETCH_OPERAND_2;
-                end
-            S_FETCH_OPERAND_2:
-                begin
-                    // Store the operand data in registers
-                    r_regs[3] <= i_data_in;
-
-                    // Transition to the execution state
-                    o_read_en   <= 0;
-                    r_state <= S_EXECUTE_OPCODE;
-                end
-            S_EXECUTE_OPCODE:
-                begin
-                    case (r_regs[0][6:0])
+                    $display("Op: %d", i_data[0][6:0]);
+                    case (i_data[0][6:0])
                         OP_ADD, OP_MULTIPLY:
                             begin
-                                // Fetch the required positions before we perform the operation
-                                o_read_en   <= 1;
-                                o_read_addr <= (r_regs[1] * 4);
-                                r_state     <= S_FETCH_POSITION_0;
+                                o_addr[1] <= i_data[1][12:0];
+                                o_addr[2] <= i_data[2][12:0];
+
+                                r_state <= S_EXECUTE_OPCODE;
                             end
                         OP_JUMP:
                             begin
+                                integer portIndex;
+                                for (portIndex = 0; portIndex < 4; ++portIndex)
+                                    o_op[portIndex] <= 0; // NONE
+
                                 // Transition to requested position
-                                r_pc    <= (r_regs[1] * 4);
+                                r_pc    <= i_data[1][10:0];
                                 r_state <= S_FETCH_OPCODE;
                             end
-								OP_HALT:
+                        OP_HALT:
                             begin
+                                integer portIndex;
+                                for (portIndex = 0; portIndex < 4; ++portIndex)
+                                    o_op[portIndex] <= 0; // NONE
+
                                 // Transition to the halted state
                                 r_state <= S_HALTED;
                             end
@@ -117,50 +86,45 @@ always @ (posedge i_clk) begin
                             r_state <= S_HALTED;
                     endcase
                 end
-            S_FETCH_POSITION_0:
-                begin
-                    // Overwrite the position address with the data from memory
-                    r_regs[1] <= i_data_in;
-
-                    // Read the next position
-                    o_read_addr <= (r_regs[2] * 4);
-                    r_state <= S_FETCH_POSITION_1;
-                end
-            S_FETCH_POSITION_1:
-                begin
-                    // Overwrite the position address with the data from memory
-                    r_regs[2] <= i_data_in;
-
-                    // Get ready to write the result operation result
-                    o_read_en <= 0;
-                    r_state   <= S_WRITE_RESULT;
-                end
-            S_WRITE_RESULT:
+            S_EXECUTE_OPCODE:
                 begin
                     // Set the write address based on the output position from the instruction
-                    o_write_addr <= (r_regs[3] * 4);
-                    o_write_en   <= 1;
+                    o_op[0]   <= 2; // WRITE
+                    o_addr[0] <= i_data[3][12:0];
+
+                    $display("Write Location: %h", i_data[3][12:0]);
 
                     // Perform the requested operation and write the result to our data output
-                    case (r_regs[0][6:0])
+                    case (i_data[0][6:0])
                         OP_ADD:
-                            o_data_out <= (r_regs[1] + r_regs[2]);
+                            begin
+                            o_data[0] <= (i_data[1] + i_data[2]);
+                            $display("Write: %d + %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
+                            end
                         OP_MULTIPLY:
-                            o_data_out <= (r_regs[1] * r_regs[2]);
+                            begin
+                            o_data[0] <= (i_data[1] * i_data[2]);
+                            $display("Write: %d * %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
+                            end
                         default:
                             // Write 0 if we end up with a bad opcode here
-                            o_data_out <= 0;
+                            o_data[0] <= 0;
                     endcase
 
+                    o_op[1] <= 0; // NONE
+                    o_op[2] <= 0; // NONE
+                    o_op[3] <= 0; // NONE
+
                     // Continue processing instructions
-                    r_pc    <= r_pc + 16;
+                    r_pc    <= r_pc + 4;
                     r_state <= S_FETCH_OPCODE;
                 end
             S_HALTED:
                 begin
                     // We're halted so make sure we don't do anything here
-                    o_write_en <= 0;
-                    o_read_en  <= 0;
+                    integer portIndex;
+                    for (portIndex = 0; portIndex < 4; ++portIndex)
+                        o_op[portIndex] <= 0; // NONE
                 end
             default:
                 begin
