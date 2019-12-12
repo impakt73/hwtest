@@ -37,7 +37,7 @@ always @ (posedge i_clk) begin
         r_state <= S_FETCH_OPCODE;
     end
     else begin
-        $display("State: %d", r_state);
+        //$display("State: %d", r_state);
         case (r_state)
             S_FETCH_OPCODE:
                 begin
@@ -53,7 +53,7 @@ always @ (posedge i_clk) begin
                 end
             S_DECODE_OPCODE:
                 begin
-                    $display("Op: %d", i_data[0][6:0]);
+                    //$display("Op: %d", i_data[0][6:0]);
                     case (i_data[0][6:0])
                         OP_ADD, OP_MULTIPLY:
                             begin
@@ -92,19 +92,19 @@ always @ (posedge i_clk) begin
                     o_op[0]   <= 2; // WRITE
                     o_addr[0] <= i_data[3][12:0];
 
-                    $display("Write Location: %h", i_data[3][12:0]);
+                    //$display("Write Location: %h", i_data[3][12:0]);
 
                     // Perform the requested operation and write the result to our data output
                     case (i_data[0][6:0])
                         OP_ADD:
                             begin
                             o_data[0] <= (i_data[1] + i_data[2]);
-                            $display("Write: %d + %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
+                            //$display("Write: %d + %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
                             end
                         OP_MULTIPLY:
                             begin
                             o_data[0] <= (i_data[1] * i_data[2]);
-                            $display("Write: %d * %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
+                            //$display("Write: %d * %d to %h", i_data[1], i_data[2], i_data[3][12:0]);
                             end
                         default:
                             // Write 0 if we end up with a bad opcode here

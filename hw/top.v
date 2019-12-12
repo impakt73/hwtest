@@ -32,7 +32,6 @@ assign o_mem_op_pending = r_mem_op_pending;
 mem mem_inst
 (
     .i_clk(i_clk),
-    .i_rst(i_rst),
 
     .i_op(w_mem_op),
     .i_addr(w_mem_addr),
