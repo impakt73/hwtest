@@ -2,9 +2,15 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-size_t MakeRegAddr(size_t regAddr)
+enum class RegisterType : uint64_t
 {
-    return (regAddr | 0x8000000000000000ull);
+    ICP_Enable = 0,
+    ICP_Halted
+};
+
+size_t MakeRegAddr(RegisterType regType)
+{
+    return (static_cast<uint64_t>(regType) | 0x8000000000000000ull);
 }
 
 int main(int argc, char** argv)
@@ -22,22 +28,33 @@ int main(int argc, char** argv)
     // Upload initial memory
     WriteProtoBridgeMemory(hBridge, pMemory, sizeof(pMemory), 0);
 
-    uint32_t numCycles = 0;
+    // Enable the IntCode Processor
+    uint64_t enableIcp = 1;
+    WriteProtoBridgeMemory(hBridge, &enableIcp, sizeof(enableIcp), MakeRegAddr(RegisterType::ICP_Enable));
+
+    const uint64_t startCycles = QueryProtoBridgeCycleCount(hBridge);
+
     uint64_t isHalted = 0;
 
     do
     {
         ClockProtoBridge(hBridge);
-        ++numCycles;
 
-        ReadProtoBridgeMemory(hBridge, MakeRegAddr(0), sizeof(isHalted), &isHalted);
+        ReadProtoBridgeMemory(hBridge, MakeRegAddr(RegisterType::ICP_Halted), sizeof(isHalted), &isHalted);
     } while (isHalted == 0);
+
+    const uint64_t endCycles = QueryProtoBridgeCycleCount(hBridge);
+
+    // Disable the IntCode Processor
+    enableIcp = 0;
+    WriteProtoBridgeMemory(hBridge, &enableIcp, sizeof(enableIcp), MakeRegAddr(RegisterType::ICP_Enable));
 
     // Read back final memory
     ReadProtoBridgeMemory(hBridge, 0, sizeof(pMemory), pMemory);
 
-    // Subtract a single cycle because it takes a cycle to detect the halted state change
-    printf("Finished in %u Cycles\n", numCycles - 1);
+    const uint32_t numCycles = static_cast<uint32_t>(endCycles - startCycles);
+
+    printf("Finished in %u Cycles\n", numCycles);
 
     printf("Final Memory[%u]: {\n", static_cast<uint32_t>(kNumQwords));
 

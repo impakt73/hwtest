@@ -137,9 +137,7 @@ always @ (posedge i_clk) begin
             S_HALTED:
                 begin
                     // We're halted so make sure we don't do anything here
-                    integer portIndex;
-                    for (portIndex = 0; portIndex < 4; ++portIndex)
-                        o_op[portIndex] <= 0; // NONE
+                    r_state <= S_HALTED;
                 end
             default:
                 begin

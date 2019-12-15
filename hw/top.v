@@ -5,7 +5,6 @@ module top
 (
     input i_clk,
     input i_rst,
-    input i_logic_en,
 
     input  wire [1:0]  i_mem_op,
     input  wire [63:0] i_mem_addr,
@@ -19,7 +18,8 @@ parameter MEM_OP_NOP   = 2'h0;
 parameter MEM_OP_READ  = 2'h1;
 parameter MEM_OP_WRITE = 2'h2;
 
-parameter MEM_ADDR_HALTED = 64'h8000_0000_0000_0000;
+parameter MEM_ADDR_ICP_ENABLE = 64'h8000_0000_0000_0000;
+parameter MEM_ADDR_HALTED     = 64'h8000_0000_0000_0001;
 
 parameter MEM_READ_STATE_IDLE  = 2'h0;
 parameter MEM_READ_STATE_LOAD  = 2'h1;
@@ -44,10 +44,11 @@ mem mem_inst
 );
 
 wire w_halted;
+reg r_icp_enable;
 
 icp icp_inst
 (
-    .i_clk(i_clk & i_logic_en),
+    .i_clk(i_clk & r_icp_enable),
     .i_rst(i_rst),
 
     .o_op(r_mem_op),
@@ -60,57 +61,65 @@ icp icp_inst
 
 always @ (posedge i_clk)
     if (i_rst)
-        r_mem_read_state <= MEM_READ_STATE_IDLE;
+        begin
+            r_icp_enable     <= 0;
+            r_mem_read_state <= MEM_READ_STATE_IDLE;
+        end
     else
-        if (i_logic_en == 0)
-            begin
-                case (r_mem_read_state)
-                    MEM_READ_STATE_IDLE:
-                        begin
-                            if (i_mem_addr[63])
-                                // If the high bit is set, this is a register operation
-                                begin
-                                    case (i_mem_addr)
-                                        MEM_ADDR_HALTED:
-                                            if (i_mem_op == MEM_OP_READ)
-                                                o_mem_data <= {{63{1'd0}}, w_halted};
-                                    endcase
-                                end
-                            else
-                                // This is a regular memory operation
-                                begin
-                                    // Forward the memory operation to the memory unit
-                                    r_mem_op[0]   <= i_mem_op;
-                                    r_mem_addr[0] <= i_mem_addr[12:0];
+        begin
+            case (r_mem_read_state)
+                MEM_READ_STATE_IDLE:
+                    begin
+                        if (i_mem_addr[63])
+                            // If the high bit is set, this is a register operation
+                            begin
+                                case (i_mem_addr)
+                                    MEM_ADDR_ICP_ENABLE:
+                                        if (i_mem_op == MEM_OP_WRITE)
+                                            r_icp_enable <= i_mem_data[0];
+                                        else if (i_mem_op == MEM_OP_READ)
+                                            o_mem_data <= {{63{1'd0}}, r_icp_enable};
+                                    MEM_ADDR_HALTED:
+                                        if (i_mem_op == MEM_OP_READ)
+                                            o_mem_data <= {{63{1'd0}}, w_halted};
+                                endcase
+                            end
+                        else if (r_icp_enable == 0)
+                            // This is a regular memory operation
+                            // We can only handle these if the icp is currently disabled otherwise we risk memory unit conflicts
+                            begin
+                                // Forward the memory operation to the memory unit
+                                r_mem_op[0]   <= i_mem_op;
+                                r_mem_addr[0] <= i_mem_addr[12:0];
 
-                                    if (i_mem_op == MEM_OP_READ)
-                                        begin
-                                            // Memory reads have a one cycle latency so we need to wait here
-                                            r_mem_read_state <= MEM_READ_STATE_LOAD;
-                                            //$display("Preparing Read From %h", i_mem_addr);
-                                        end
-                                    else if (i_mem_op == MEM_OP_WRITE)
-                                        begin
-                                            r_mem_data_in[0] <= i_mem_data;
-                                            //$display("Writing %h To %h", i_mem_data, i_mem_addr);
-                                        end
-                                end
-                        end
-                    MEM_READ_STATE_LOAD:
-                        begin
-                            r_mem_read_state <= MEM_READ_STATE_WRITE;
-                        end
-                    MEM_READ_STATE_WRITE:
-                        begin
-                            //$display("Returing %h From Memory Bus", w_mem_data_out[0]);
-                            o_mem_data <= w_mem_data_out[0];
-                            r_mem_read_state <= MEM_READ_STATE_IDLE;
-                        end
-                    default:
-                        begin
-                            r_mem_read_state <= MEM_READ_STATE_IDLE;
-                        end
-                endcase
-            end
+                                if (i_mem_op == MEM_OP_READ)
+                                    begin
+                                        // Memory reads have a one cycle latency so we need to wait here
+                                        r_mem_read_state <= MEM_READ_STATE_LOAD;
+                                        //$display("Preparing Read From %h", i_mem_addr);
+                                    end
+                                else if (i_mem_op == MEM_OP_WRITE)
+                                    begin
+                                        r_mem_data_in[0] <= i_mem_data;
+                                        //$display("Writing %h To %h", i_mem_data, i_mem_addr);
+                                    end
+                            end
+                    end
+                MEM_READ_STATE_LOAD:
+                    begin
+                        r_mem_read_state <= MEM_READ_STATE_WRITE;
+                    end
+                MEM_READ_STATE_WRITE:
+                    begin
+                        //$display("Returing %h From Memory Bus", w_mem_data_out[0]);
+                        o_mem_data <= w_mem_data_out[0];
+                        r_mem_read_state <= MEM_READ_STATE_IDLE;
+                    end
+                default:
+                    begin
+                        r_mem_read_state <= MEM_READ_STATE_IDLE;
+                    end
+            endcase
+        end
 
 endmodule
