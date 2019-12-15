@@ -12,12 +12,14 @@ module icp
 );
 
 reg [10:0] r_pc;
-reg [1:0]  r_state;
+reg [2:0]  r_state;
 
-parameter S_FETCH_OPCODE   = 2'h0;
-parameter S_DECODE_OPCODE  = 2'h1;
-parameter S_EXECUTE_OPCODE = 2'h2;
-parameter S_HALTED         = 2'h3;
+parameter S_FETCH_OPCODE   = 3'h0;
+parameter S_FETCH_WAIT     = 3'h1;
+parameter S_DECODE_OPCODE  = 3'h2;
+parameter S_DECODE_WAIT    = 3'h3;
+parameter S_EXECUTE_OPCODE = 3'h4;
+parameter S_HALTED         = 3'h5;
 
 parameter OP_ADD      = 7'd1;
 parameter OP_MULTIPLY = 7'd2;
@@ -49,6 +51,10 @@ always @ (posedge i_clk) begin
                             o_addr[portIndex] <= { {2{1'b0}}, r_pc + portIndex[10:0] };
                         end
 
+                    r_state <= S_FETCH_WAIT;
+                end
+            S_FETCH_WAIT:
+                begin
                     r_state <= S_DECODE_OPCODE;
                 end
             S_DECODE_OPCODE:
@@ -60,7 +66,7 @@ always @ (posedge i_clk) begin
                                 o_addr[1] <= i_data[1][12:0];
                                 o_addr[2] <= i_data[2][12:0];
 
-                                r_state <= S_EXECUTE_OPCODE;
+                                r_state <= S_DECODE_WAIT;
                             end
                         OP_JUMP:
                             begin
@@ -80,11 +86,17 @@ always @ (posedge i_clk) begin
 
                                 // Transition to the halted state
                                 r_state <= S_HALTED;
+
+                                //$display("Processed Halted Instruction");
                             end
                         default:
                             // Halt if we end up with a bad opcode
                             r_state <= S_HALTED;
                     endcase
+                end
+            S_DECODE_WAIT:
+                begin
+                    r_state <= S_EXECUTE_OPCODE;
                 end
             S_EXECUTE_OPCODE:
                 begin
@@ -108,7 +120,10 @@ always @ (posedge i_clk) begin
                             end
                         default:
                             // Write 0 if we end up with a bad opcode here
-                            o_data[0] <= 0;
+                            begin
+                                //$display("BAD OPCODE");
+                                o_data[0] <= 0;
+                            end
                     endcase
 
                     o_op[1] <= 0; // NONE
