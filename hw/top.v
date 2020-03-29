@@ -1,5 +1,6 @@
 `include "icp.v"
 `include "mem.v"
+`include "uart_tx.v"
 
 module top
 (
@@ -89,6 +90,22 @@ assign w_mem_data_in[3] = r_icp_enable ? w_icp_mem_data_out[3] : 64'b0;
 
 assign w_icp_mem_data_in = w_mem_data_out;
 
+wire w_uart_rdy;
+wire w_uart_tx;
+reg [7:0] r_uart_tx_data;
+reg r_uart_tx_data_valid;
+
+uart_tx uart_tx_inst
+(
+    .i_clk(i_clk),
+    .i_rst(i_rst),
+
+    .o_rdy(w_uart_rdy),
+    .o_tx(w_uart_tx),
+    .i_data(r_uart_tx_data),
+    .i_data_valid(r_uart_tx_data_valid)
+);
+
 always @ (posedge i_clk)
     if (i_rst)
         begin
@@ -97,6 +114,17 @@ always @ (posedge i_clk)
         end
     else
         begin
+            // Test code for UART TX module
+            if (w_uart_rdy)
+                begin
+                    r_uart_tx_data <= 97;
+                    r_uart_tx_data_valid <= 1;
+                end
+            else
+                begin
+                    r_uart_tx_data <= 0;
+                    r_uart_tx_data_valid <= 0;
+                end
             case (r_mem_read_state)
                 MEM_READ_STATE_IDLE:
                     begin
