@@ -6,8 +6,8 @@ module uart_tx
     input i_clk,
     input i_rst,
 
-    output reg         o_rdy,
     output reg         o_tx,
+    output reg         o_data_rdy,
     input  wire  [7:0] i_data,
     input  wire        i_data_valid
 );
@@ -37,7 +37,7 @@ always @ (posedge i_clk)
             r_data        <= 0;
             r_clk_counter <= 0;
             o_tx          <= 1;
-            o_rdy         <= 1;
+            o_data_rdy    <= 1;
         end
     else
         begin
@@ -47,18 +47,18 @@ always @ (posedge i_clk)
                     // The transmit line should always high when there's no activity
                     o_tx  <= 1;
 
-                    if (o_rdy)
+                    if (o_data_rdy)
                         if (i_data_valid)
                             begin
-                                r_data <= i_data;
-                                o_rdy  <= 0;
+                                r_data     <= i_data;
+                                o_data_rdy <= 0;
                             end
 
                     if (r_clk_counter == COUNTER_SIZE'(CLK_PER_BIT - 1))
                         begin
                             r_clk_counter <= 0;
 
-                            if (!o_rdy)
+                            if (!o_data_rdy)
                                 begin
                                     r_state <= S_TX_START_BIT;
                                     o_tx    <= 0;
@@ -71,7 +71,7 @@ always @ (posedge i_clk)
                 end
             else
                 begin
-                    o_rdy <= 0;
+                    o_data_rdy <= 0;
 
                     case (r_state)
                         S_TX_START_BIT:
@@ -88,8 +88,8 @@ always @ (posedge i_clk)
                                 // our internal byte payload
                                 if (i_data_valid)
                                     begin
-                                        r_data  <= i_data;
-                                        o_rdy   <= 0;
+                                        r_data     <= i_data;
+                                        o_data_rdy <= 0;
                                     end
                             end
                         default:
@@ -113,14 +113,14 @@ always @ (posedge i_clk)
                                 S_TX_BIT_7:
                                     begin
                                         // After we transmit the last bit, we need to transmit the stop bit
-                                        r_state <= S_TX_STOP_BIT;
-                                        o_tx    <= 1;
-                                        o_rdy   <= 1;
+                                        r_state    <= S_TX_STOP_BIT;
+                                        o_tx       <= 1;
+                                        o_data_rdy <= 1;
                                     end
                                 S_TX_STOP_BIT:
                                     begin
                                         // If we have valid data during the stop bit stage, we can move straight into the start bit for it
-                                        if (!o_rdy)
+                                        if (!o_data_rdy)
                                             begin
                                                 r_state <= S_TX_START_BIT;
                                                 o_tx    <= 0;
@@ -128,9 +128,9 @@ always @ (posedge i_clk)
                                         else
                                             begin
                                                 // We transition back to idle once we finish transmitting the stop bit
-                                                r_state <= S_IDLE;
-                                                o_tx    <= 1;
-                                                o_rdy   <= 1;
+                                                r_state    <= S_IDLE;
+                                                o_tx       <= 1;
+                                                o_data_rdy <= 1;
                                             end
                                     end
                                 default:

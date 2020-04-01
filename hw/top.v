@@ -1,6 +1,7 @@
 `include "icp.v"
 `include "mem.v"
 `include "uart_tx.v"
+`include "uart_rx.v"
 
 module top
 (
@@ -90,41 +91,72 @@ assign w_mem_data_in[3] = r_icp_enable ? w_icp_mem_data_out[3] : 64'b0;
 
 assign w_icp_mem_data_in = w_mem_data_out;
 
-wire w_uart_rdy;
+wire w_uart_tx_data_rdy;
 wire w_uart_tx;
 reg [7:0] r_uart_tx_data;
 reg r_uart_tx_data_valid;
 
-uart_tx uart_tx_inst
+uart_tx #(.CLK_PER_BIT(4)) uart_tx_inst
 (
     .i_clk(i_clk),
     .i_rst(i_rst),
 
-    .o_rdy(w_uart_rdy),
     .o_tx(w_uart_tx),
+    .o_data_rdy(w_uart_tx_data_rdy),
     .i_data(r_uart_tx_data),
     .i_data_valid(r_uart_tx_data_valid)
 );
 
+wire [7:0] w_uart_rx_data;
+wire w_uart_rx_data_valid;
+reg r_uart_rx_data_rdy;
+
+uart_rx #(.CLK_PER_BIT(4)) uart_rx_inst
+(
+    .i_clk(i_clk),
+    .i_rst(i_rst),
+
+    .o_data(w_uart_rx_data),
+    .o_data_valid(w_uart_rx_data_valid),
+    .i_data_rdy(r_uart_rx_data_rdy),
+    .i_rx(w_uart_tx)
+);
+
+reg [7:0] r_uart_counter;
+reg [7:0] r_last_uart_rx_data;
+
 always @ (posedge i_clk)
     if (i_rst)
         begin
-            r_icp_enable     <= 0;
-            r_mem_read_state <= MEM_READ_STATE_IDLE;
+            r_icp_enable         <= 0;
+            r_mem_read_state     <= MEM_READ_STATE_IDLE;
+            r_uart_counter       <= 0;
+            r_uart_tx_data       <= 0;
+            r_uart_tx_data_valid <= 0;
+            r_uart_rx_data_rdy   <= 1;
+            r_last_uart_rx_data  <= 0;
         end
     else
         begin
             // Test code for UART TX module
-            if (w_uart_rdy)
+            if (w_uart_tx_data_rdy)
                 begin
-                    r_uart_tx_data <= 97;
+                    r_uart_tx_data       <= r_uart_counter;
                     r_uart_tx_data_valid <= 1;
                 end
-            else
+
+            if (r_uart_tx_data_valid)
                 begin
-                    r_uart_tx_data <= 0;
+                    r_uart_counter       <= (r_uart_counter + 1);
+                    r_uart_tx_data       <= 0;
                     r_uart_tx_data_valid <= 0;
                 end
+
+            if (w_uart_rx_data_valid)
+                begin
+                    r_last_uart_rx_data <= w_uart_rx_data;
+                end
+
             case (r_mem_read_state)
                 MEM_READ_STATE_IDLE:
                     begin
