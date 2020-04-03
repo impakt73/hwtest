@@ -71,8 +71,6 @@ always @ (posedge i_clk)
                 end
             else
                 begin
-                    o_data_rdy <= 0;
-
                     case (r_state)
                         S_TX_START_BIT:
                             begin

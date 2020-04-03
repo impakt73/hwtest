@@ -8,7 +8,6 @@ module uart_rx
 
     output reg  [7:0] o_data,
     output reg        o_data_valid,
-    input  wire       i_data_rdy,
     input  wire       i_rx
 );
 
@@ -50,11 +49,8 @@ always @ (posedge i_clk)
                     // If the RX line goes low, then we assume it's the start bit
                     if (i_rx == 0)
                         begin
-                            if (i_data_rdy)
-                                begin
-                                    r_state      <= S_RX_START_BIT;
-                                    o_data_valid <= 0;
-                                end
+                            r_state      <= S_RX_START_BIT;
+                            o_data_valid <= 0;
                         end
                 end
             else
@@ -122,7 +118,7 @@ always @ (posedge i_clk)
                                             end
                                         S_RX_STOP_BIT:
                                             begin
-                                                if ((i_rx == 1) || (i_data_rdy == 0))
+                                                if (i_rx == 1)
                                                     // The input line has returned to the idle state or we're not ready to receive
                                                     // more data so we should transition back to idle
                                                     r_state <= S_IDLE;

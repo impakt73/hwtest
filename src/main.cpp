@@ -5,7 +5,9 @@
 enum class RegisterType : uint64_t
 {
     ICP_Enable = 0,
-    ICP_Halted
+    ICP_Halted,
+    UART_TX,
+    UART_RX
 };
 
 size_t MakeRegAddr(RegisterType regType)
@@ -24,6 +26,19 @@ int main(int argc, char** argv)
 
     ProtoBridge hBridge;
     CreateProtoBridge(&hBridge);
+
+    for (uint32_t i = 0; i < 256; ++i)
+    {
+        // Send the test byte
+        uint64_t txTestByte = i;
+        WriteProtoBridgeMemory(hBridge, &txTestByte, sizeof(txTestByte), MakeRegAddr(RegisterType::UART_TX));
+
+        // Read the test byte
+        uint64_t rxTestByte = 0;
+        ReadProtoBridgeMemory(hBridge, MakeRegAddr(RegisterType::UART_RX), sizeof(rxTestByte), &rxTestByte);
+
+        printf("Sent: %u, Received: %u\n", static_cast<uint32_t>(txTestByte), static_cast<uint32_t>(rxTestByte));
+    }
 
     // Upload initial memory
     WriteProtoBridgeMemory(hBridge, pMemory, sizeof(pMemory), 0);
