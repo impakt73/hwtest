@@ -27,17 +27,17 @@ int main(int argc, char** argv)
     ProtoBridge hBridge;
     CreateProtoBridge(&hBridge);
 
-    for (uint32_t i = 0; i < 256; ++i)
+    for (uint32_t i = 0; i < 26; ++i)
     {
         // Send the test byte
-        uint64_t txTestByte = i;
+        uint64_t txTestByte = 'A' + i;
         WriteProtoBridgeMemory(hBridge, &txTestByte, sizeof(txTestByte), MakeRegAddr(RegisterType::UART_TX));
 
         // Read the test byte
         uint64_t rxTestByte = 0;
         ReadProtoBridgeMemory(hBridge, MakeRegAddr(RegisterType::UART_RX), sizeof(rxTestByte), &rxTestByte);
 
-        printf("Sent: %u, Received: %u\n", static_cast<uint32_t>(txTestByte), static_cast<uint32_t>(rxTestByte));
+        printf("Sent: %c, Received: %c\n", static_cast<char>(txTestByte), static_cast<char>(rxTestByte));
     }
 
     // Upload initial memory

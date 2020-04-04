@@ -43,15 +43,15 @@ always @ (posedge i_clk)
         end
     else
         begin
+            // We consider our output data invalid by default.
+            o_data_valid  <= 0;
+
             // Handle Receive Logic
             if (r_state == S_IDLE)
                 begin
                     // If the RX line goes low, then we assume it's the start bit
                     if (i_rx == 0)
-                        begin
-                            r_state      <= S_RX_START_BIT;
-                            o_data_valid <= 0;
-                        end
+                        r_state <= S_RX_START_BIT;
                 end
             else
                 begin
@@ -77,7 +77,7 @@ always @ (posedge i_clk)
                                             end
                                         else
                                             begin
-                                                // Expose our data once we've confirmed the stop bit
+                                                // Expose our data for a clock once we've confirmed the stop bit
                                                 o_data       <= r_data;
                                                 o_data_valid <= 1;
                                                 r_data       <= 0;
@@ -119,15 +119,18 @@ always @ (posedge i_clk)
                                         S_RX_STOP_BIT:
                                             begin
                                                 if (i_rx == 1)
-                                                    // The input line has returned to the idle state or we're not ready to receive
-                                                    // more data so we should transition back to idle
-                                                    r_state <= S_IDLE;
+                                                    begin
+                                                        // The input line has returned to the idle state or we're not ready to receive
+                                                        // more data so we should transition back to idle
+                                                        r_state <= S_IDLE;
+                                                    end
                                                 else
-                                                    // The input line has gone low which indicates that it's about to send more data
-                                                    // Transition to the start bit phase and mark our data as invalid since we'll be
-                                                    // receiving new data soon
-                                                    r_state      <= S_RX_START_BIT;
-                                                    o_data_valid <= 0;
+                                                    begin
+                                                        // The input line has gone low which indicates that it's about to send more data
+                                                        // Transition to the start bit phase and mark our data as invalid since we'll be
+                                                        // receiving new data soon
+                                                        r_state <= S_RX_START_BIT;
+                                                    end
                                             end
                                         default:
                                             begin
